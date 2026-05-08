@@ -24,6 +24,7 @@ export interface PlacedStar {
   starId: string;
   x: number;
   y: number;
+  z: number;
   magnitude: number;
 }
 
@@ -42,7 +43,7 @@ export function placeConstellation(starIds: string[]): PlacedStar[] {
 
   // 단일 별: 정중앙
   if (n === 1) {
-    return [{ starId: starIds[0], x: 0.5, y: 0.5, magnitude: 1.1 }];
+    return [{ starId: starIds[0], x: 0.5, y: 0.5, z: 0, magnitude: 1.1 }];
   }
 
   const margin = 0.16;
@@ -90,6 +91,8 @@ export function placeConstellation(starIds: string[]): PlacedStar[] {
     starId: id,
     x: points[i].x,
     y: points[i].y,
+    // z 깊이 변동 — deterministic, ±0.25
+    z: (rng() - 0.5) * 0.5,
     // 밝기 가변 — 0.7 ~ 1.3, 한두 개는 더 밝게
     magnitude: 0.75 + rng() * 0.55,
   }));

@@ -1,0 +1,23 @@
+{
+  "name": "functions",
+  "main": "lib/index.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "serve": "npm run build && firebase emulators:start --only functions --project byeolzari-dev",
+    "shell": "npm run build && firebase functions:shell --project byeolzari-dev",
+    "deploy": "firebase deploy --only functions --project byeolzari-dev",
+    "logs": "firebase functions:log --project byeolzari-dev"
+  },
+  "engines": { "node": "20" },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "geofire-common": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.7.2"
+  }
+}

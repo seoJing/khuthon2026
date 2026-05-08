@@ -46,33 +46,47 @@ export const useApp = create<AppState>()(
       cooldowns: {},
 
       completeOnboarding: (starIds) => {
-        const ids = starIds.slice(0, 7);
+        // dedup + 7개 cap
+        const ids = Array.from(new Set(starIds)).slice(0, 7);
         set({ onboarded: true, myStars: makeConstellation(ids) });
       },
 
       addStar: (starId) => {
-        const { myStars } = get();
+        const { myStars, otherUniverse } = get();
         if (myStars.some((s) => s.starId === starId)) return { ok: true };
         if (myStars.length >= 7) {
           return { ok: false, reason: "full", current: myStars };
         }
+        const nextIds = Array.from(
+          new Set([...myStars.map((s) => s.starId), starId]),
+        ).slice(0, 7);
         set({
-          myStars: makeConstellation([...myStars.map((s) => s.starId), starId]),
+          myStars: makeConstellation(nextIds),
+          // 내 별자리에 들어왔으니 다른 우주 풀에서 제거
+          otherUniverse: otherUniverse.filter((u) => u.starId !== starId),
         });
         return { ok: true };
       },
 
       forceAddStar: (starId, replaceTargetId) => {
-        const { myStars, cooldowns } = get();
+        const { myStars, cooldowns, otherUniverse } = get();
+        // 가드 — 이미 들어 있거나 잘못된 타겟이면 작업 안 함 (7개 초과 방지)
+        if (myStars.some((s) => s.starId === starId)) return;
+        if (!myStars.some((s) => s.starId === replaceTargetId)) return;
         const filteredIds = myStars
           .filter((s) => s.starId !== replaceTargetId)
           .map((s) => s.starId);
+        const nextIds = Array.from(
+          new Set([...filteredIds, starId]),
+        ).slice(0, 7);
         set({
-          myStars: makeConstellation([...filteredIds, starId]),
+          myStars: makeConstellation(nextIds),
           cooldowns: {
             ...cooldowns,
             [replaceTargetId]: Date.now() + COOLDOWN_MS,
           },
+          // 새로 추가된 별은 다른 우주에서 제거
+          otherUniverse: otherUniverse.filter((u) => u.starId !== starId),
         });
       },
 
@@ -103,7 +117,21 @@ export const useApp = create<AppState>()(
         onboarded: s.onboarded,
         myStars: s.myStars,
         cooldowns: s.cooldowns,
+        otherUniverse: s.otherUniverse,
       }),
+      // hydrate 시 기존 손상 데이터 자동 복구 — 중복 제거 + 7개 cap
+      onRehydrateStorage: () => (state) => {
+        if (!state || !state.myStars) return;
+        const seen = new Set<string>();
+        const cleaned = state.myStars.filter((s) => {
+          if (seen.has(s.starId)) return false;
+          seen.add(s.starId);
+          return true;
+        }).slice(0, 7);
+        if (cleaned.length !== state.myStars.length) {
+          state.myStars = cleaned;
+        }
+      },
     },
   ),
 );

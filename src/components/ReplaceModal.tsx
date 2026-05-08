@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { resolveStar, useApp } from "@/lib/store";
 import { CosmicBackdrop } from "./Cosmos";
 import { StarPoint } from "./StarPoint";
@@ -17,6 +17,7 @@ export function ReplaceModal({ open, newStarId, onCancel, onDone }: Props) {
   const myStars = useApp((s) => s.myStars);
   const forceAddStar = useApp((s) => s.forceAddStar);
   const [pendingDropId, setPendingDropId] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const newStar = newStarId ? resolveStar(newStarId) : null;
   const dropStar = pendingDropId ? resolveStar(pendingDropId) : null;
@@ -86,10 +87,16 @@ export function ReplaceModal({ open, newStarId, onCancel, onDone }: Props) {
               <div className="w-full mt-12 space-y-3">
                 <button
                   onClick={() => {
+                    if (submittingRef.current) return; // 더블클릭 가드
+                    submittingRef.current = true;
                     if (newStarId && pendingDropId) {
                       forceAddStar(newStarId, pendingDropId);
                     }
                     onDone();
+                    // 다음 모달 열림 위해 약간 후 초기화
+                    window.setTimeout(() => {
+                      submittingRef.current = false;
+                    }, 500);
                   }}
                   className="w-full bg-fg text-bg rounded-full py-4 text-[14px] font-medium tracking-tight active:scale-[0.98]"
                 >

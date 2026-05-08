@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useMotionValue } from "framer-motion";
-import { ConstellationView } from "@/components/ConstellationView";
+import { AnimatePresence, motion } from "framer-motion";
 import { CosmicBackdrop } from "@/components/Cosmos";
 import { useApp } from "@/lib/store";
 
@@ -14,8 +13,6 @@ export default function HomePage() {
   const otherUniverse = useApp((s) => s.otherUniverse);
   const [hydrated, setHydrated] = useState(false);
   const [showHint, setShowHint] = useState(true);
-  const dragY = useMotionValue(0);
-  const triggeredRef = useRef(false);
 
   useEffect(() => setHydrated(true), []);
   useEffect(() => {
@@ -27,72 +24,67 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, []);
 
-  const onDragEnd = (_: unknown, info: { offset: { y: number } }) => {
-    if (info.offset.y < -80 && !triggeredRef.current) {
-      triggeredRef.current = true;
-      router.push("/other-universe");
-    }
-  };
-
   return (
     <div className="absolute inset-0">
-      <CosmicBackdrop density={1.1} variant="deep" />
+      <CosmicBackdrop
+        density={1.1}
+        variant="deep"
+        interactive
+        constellation={{
+          starIds: myStars.map((s) => s.starId),
+          onTap: (starId) =>
+            router.push(`/card?ctx=mine&starId=${encodeURIComponent(starId)}`),
+        }}
+      />
 
-      <motion.div
-        drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.4}
-        onDragEnd={onDragEnd}
-        style={{ y: dragY }}
-        className="absolute inset-0 touch-none"
-      >
-        <header className="absolute top-0 left-0 right-0 safe-top z-10 px-6 pt-3 flex items-start justify-between">
-          <div>
-            <p className="label-kr">내 별자리</p>
-            <h2 className="display-medium text-[20px] mt-2 leading-none">
-              <span className="font-light">{myStars.length}</span>
-              <span className="text-fg-muted font-extralight"> / 7</span>
-            </h2>
-          </div>
-          <button
-            onClick={() => router.push("/settings")}
-            className="label-kr-bright active:text-fg transition px-1"
+      <header className="absolute top-0 left-0 right-0 safe-top z-10 px-6 pt-3 flex items-start justify-between pointer-events-none">
+        <div className="pointer-events-auto">
+          <p className="label-kr">내 별자리</p>
+          <h2 className="display-medium text-[20px] mt-2 leading-none">
+            <span className="font-light">{myStars.length}</span>
+            <span className="text-fg-muted font-extralight"> / 7</span>
+          </h2>
+        </div>
+        <button
+          onClick={() => router.push("/settings")}
+          className="label-kr-bright active:text-fg transition px-1 pointer-events-auto"
+        >
+          설정
+        </button>
+      </header>
+
+      {otherUniverse.length > 0 && (
+        <button
+          onClick={() => router.push("/other-universe")}
+          className="absolute bottom-7 left-1/2 -translate-x-1/2 z-10 glass rounded-full px-4 py-2 flex items-center gap-2 active:scale-95 transition pointer-events-auto"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M18 15l-6-6-6 6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-fg-dim"
+            />
+          </svg>
+          <span className="label-kr-bright">다른 우주</span>
+        </button>
+      )}
+
+      <AnimatePresence>
+        {showHint && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.4 }}
+            className="absolute top-20 left-0 right-0 text-center label-kr-fine pointer-events-none z-10"
           >
-            설정
-          </button>
-        </header>
-
-        <ConstellationView
-          starIds={myStars.map((s) => s.starId)}
-          onTap={(starId) =>
-            router.push(`/card?ctx=mine&starId=${encodeURIComponent(starId)}`)
-          }
-        />
-
-        <AnimatePresence>
-          {showHint && otherUniverse.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1, y: [0, -5, 0] }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute bottom-12 left-0 right-0 flex flex-col items-center pointer-events-none"
-            >
-              <p className="label-kr-fine mb-2.5">위로 쓸어올리기</p>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M18 15l-6-6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-fg-muted"
-                />
-              </svg>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+            드래그·핀치로 별자리 주위를 둘러보세요
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

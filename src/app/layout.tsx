@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthBootstrap } from "@/components/AuthBootstrap";
 
 export const metadata: Metadata = {
   title: "별자리 — Byeolzari",
@@ -20,7 +21,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="antialiased select-none">
-        <div className="app-shell">{children}</div>
+        <div className="app-shell">
+          <AuthBootstrap>{children}</AuthBootstrap>
+        </div>
       </body>
     </html>
   );

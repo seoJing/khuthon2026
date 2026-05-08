@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 사용자 — 익명. 본인만 읽기·쓰기.
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 카테고리 — 모든 사용자 읽기, 서버만 쓰기.
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // 별 카탈로그 — 읽기 공개, 쓰기는 서버.
+    // 자유 입력 별(BR-14) MVP에선 본인만 보유 → server-side로 처리.
+    match /stars/{starId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // 별 콘텐츠 — 읽기 공개, 쓰기 서버.
+    match /contents/{contentId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // 사용자 별자리 — 본인만 (BR-01: 1~7 enforce는 클라+서버 모두).
+    match /users/{userId}/constellation/{starId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 다른 우주 풀 — 본인만 읽기, 쓰기는 서버 매칭이 처리.
+    match /users/{userId}/otherUniverse/{key} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // 떨군 별 쿨다운 — 본인만 읽기.
+    match /users/{userId}/cooldowns/{starId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 알림 일일 카운트 — 본인만 읽기, 쓰기 서버.
+    match /users/{userId}/dailyAlerts/{dayKey} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // 알림 로그 — 본인만 읽기.
+    match /users/{userId}/notifications/{notifId} {
+      allow read, update: if isOwner(userId);
+      allow create, delete: if false;
+    }
+
+    // 인카운터 — 서버만 (BR-04 사람 단위 영구 dedup).
+    match /encounters/{encounterId} {
+      allow read, write: if false;
+    }
+
+    // 사용자 위치 핑 — 본인이 쓰기, 서버가 읽기.
+    match /pings/{userId} {
+      allow read: if false;
+      allow write: if isOwner(userId);
+    }
+  }
+}

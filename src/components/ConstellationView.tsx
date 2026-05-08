@@ -38,7 +38,7 @@ export function ConstellationView({ starIds, onTap, emptyMessage }: Props) {
   const maxLen = Math.max(0.001, ...lengths);
 
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 pointer-events-none">
       {edges.length > 0 && (
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
@@ -135,8 +135,8 @@ export function ConstellationView({ starIds, onTap, emptyMessage }: Props) {
                 duration: 0.9,
                 ease: [0.19, 1, 0.22, 1],
               }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform group"
-              style={{ width: size, height: size }}
+              className="absolute -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform group pointer-events-auto"
+              style={{ width: size + 16, height: size + 16, padding: 8 }}
               aria-label={meta.title}
             >
               <StarPoint size={size} warm={warm} twinkle intensity={intensity} />
