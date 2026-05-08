@@ -40,8 +40,14 @@ export function CosmicBackdrop({
   interactive = false,
   constellation,
 }: BackdropProps) {
+  // r3f Canvas의 inline style(position:relative, width/height 100%) 때문에
+  // 부모가 flex 컨테이너이면 backdrop 가 flex 영역 전체를 먹는 버그가 있음.
+  // absolute 래퍼로 감싸 flex flow 밖으로 분리.
   return (
-    <>
+    <div
+      className="absolute inset-0 pointer-events-none"
+      aria-hidden={!interactive}
+    >
       <Nebula variant={variant} />
       <CosmosThree
         density={density}
@@ -50,7 +56,7 @@ export function CosmicBackdrop({
         constellation={constellation}
       />
       <div aria-hidden className="absolute inset-0 grain pointer-events-none" />
-    </>
+    </div>
   );
 }
 

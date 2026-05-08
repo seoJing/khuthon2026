@@ -40,6 +40,22 @@ const NEIGHBORHOODS: Array<{
     neLat: 37.572,
     neLng: 127.0,
   },
+  // 회기동 (경희대 서울캠퍼스 일대)
+  {
+    name: "KR/Seoul/회기동",
+    swLat: 37.589,
+    swLng: 127.043,
+    neLat: 37.606,
+    neLng: 127.062,
+  },
+  // 영통 (경희대 국제캠퍼스 일대 — 수원시 영통구)
+  {
+    name: "KR/Suwon/영통",
+    swLat: 37.230,
+    swLng: 127.062,
+    neLat: 37.255,
+    neLng: 127.092,
+  },
 ];
 
 const SEOUL_BOX = {

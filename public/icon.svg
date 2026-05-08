@@ -1,0 +1,85 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#1a1638" />
+      <stop offset="40%" stop-color="#0c0a25" />
+      <stop offset="100%" stop-color="#04050a" />
+    </radialGradient>
+
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="14%" stop-color="#fff5c8" stop-opacity="0.65" />
+      <stop offset="34%" stop-color="#f5c878" stop-opacity="0.28" />
+      <stop offset="65%" stop-color="#d28a48" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#d28a48" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="spikeX" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#fff8dc" stop-opacity="0" />
+      <stop offset="42%" stop-color="#fff8dc" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="1" />
+      <stop offset="58%" stop-color="#fff8dc" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#fff8dc" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="spikeY" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#fff8dc" stop-opacity="0" />
+      <stop offset="42%" stop-color="#fff8dc" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="1" />
+      <stop offset="58%" stop-color="#fff8dc" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#fff8dc" stop-opacity="0" />
+    </linearGradient>
+
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+      <stop offset="55%" stop-color="#fff8dc" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#f5e7c4" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1024" height="1024" fill="url(#bg)" />
+
+  <!-- 작은 배경 별들 (별자리 분위기) -->
+  <g fill="#f5e7c4">
+    <circle cx="180" cy="220" r="4" opacity="0.55" />
+    <circle cx="850" cy="280" r="5" opacity="0.6" />
+    <circle cx="140" cy="780" r="4" opacity="0.5" />
+    <circle cx="870" cy="800" r="4.5" opacity="0.55" />
+    <circle cx="380" cy="880" r="3" opacity="0.45" />
+    <circle cx="700" cy="160" r="3" opacity="0.5" />
+    <circle cx="100" cy="500" r="3" opacity="0.4" />
+    <circle cx="930" cy="540" r="2.5" opacity="0.4" />
+  </g>
+  <g fill="#dde5f5">
+    <circle cx="280" cy="120" r="3" opacity="0.5" />
+    <circle cx="640" cy="900" r="3.5" opacity="0.5" />
+    <circle cx="50" cy="350" r="2.5" opacity="0.4" />
+  </g>
+
+  <!-- 별자리 미세 연결선 (분위기만) -->
+  <g stroke="#f5e7c4" stroke-width="1" fill="none" opacity="0.18">
+    <path d="M180,220 L512,512 L850,280" />
+    <path d="M512,512 L140,780" />
+    <path d="M512,512 L870,800" />
+  </g>
+
+  <!-- 외곽 큰 헤일로 -->
+  <circle cx="512" cy="512" r="370" fill="url(#halo)" opacity="0.7" />
+
+  <!-- 회절 스파이크 — 주 십자 -->
+  <ellipse cx="512" cy="512" rx="440" ry="6" fill="url(#spikeX)" opacity="0.9" />
+  <ellipse cx="512" cy="512" rx="6" ry="440" fill="url(#spikeY)" opacity="0.9" />
+
+  <!-- 회절 스파이크 — 보조 대각 -->
+  <g transform="translate(512 512) rotate(45) translate(-512 -512)">
+    <ellipse cx="512" cy="512" rx="240" ry="3" fill="url(#spikeX)" opacity="0.45" />
+    <ellipse cx="512" cy="512" rx="3" ry="240" fill="url(#spikeY)" opacity="0.45" />
+  </g>
+
+  <!-- 내부 글로우 -->
+  <circle cx="512" cy="512" r="80" fill="url(#core)" opacity="0.85" />
+
+  <!-- 핵 -->
+  <circle cx="512" cy="512" r="22" fill="#ffffff" />
+</svg>

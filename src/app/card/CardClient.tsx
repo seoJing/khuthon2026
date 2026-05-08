@@ -161,24 +161,26 @@ export default function CardClient() {
       // 끝 도달 — 마지막에서 멈춤. 추가 페이지 도착하면 자연스럽게 진행 가능
       return;
     }
-    setTransition({ dx: 0, dy: -1, key: `${currentStarId}-${contentIndex + 1}` });
+    // 사용자가 위로 쓸어올리면(swipe up) 다음 콘텐츠 — 새 카드는 아래에서 올라오고, 옛 카드는 위로 사라짐
+    setTransition({ dx: 0, dy: 1, key: `${currentStarId}-${contentIndex + 1}` });
     setContentIndex((i) => i + 1);
   };
   const goPrevContent = () => {
     if (contentIndex === 0) return;
-    setTransition({ dx: 0, dy: 1, key: `${currentStarId}-${contentIndex - 1}` });
+    setTransition({ dx: 0, dy: -1, key: `${currentStarId}-${contentIndex - 1}` });
     setContentIndex((i) => i - 1);
   };
   const goNextStar = () => {
     if (starOrder.length <= 1) return;
     const next = (starIndex + 1) % starOrder.length;
-    setTransition({ dx: -1, dy: 0, key: `${starOrder[next]}-0` });
+    // 왼쪽으로 쓸어 다음 별 — 새 카드는 오른쪽에서 들어오고, 옛 카드는 왼쪽으로 사라짐
+    setTransition({ dx: 1, dy: 0, key: `${starOrder[next]}-0` });
     setStarIndex(next);
   };
   const goPrevStar = () => {
     if (starOrder.length <= 1) return;
     const prev = (starIndex - 1 + starOrder.length) % starOrder.length;
-    setTransition({ dx: 1, dy: 0, key: `${starOrder[prev]}-0` });
+    setTransition({ dx: -1, dy: 0, key: `${starOrder[prev]}-0` });
     setStarIndex(prev);
   };
 
@@ -294,9 +296,9 @@ export default function CardClient() {
           onPointerLeave={cancelLongPress}
           initial={{
             opacity: 0,
-            x: transition.dx * 80,
-            y: transition.dy * 80,
-            scale: 0.97,
+            x: transition.dx * 100,
+            y: transition.dy * 100,
+            scale: 1,
             rotate: 0,
           }}
           animate={
@@ -313,9 +315,9 @@ export default function CardClient() {
           }
           exit={{
             opacity: 0,
-            x: -transition.dx * 80,
-            y: -transition.dy * 80,
-            scale: 0.97,
+            x: -transition.dx * 100,
+            y: -transition.dy * 100,
+            scale: 1,
           }}
           transition={
             compress
@@ -326,8 +328,9 @@ export default function CardClient() {
                   ease: [0.42, 0, 0.95, 0.8],
                 }
               : {
-                  duration: 0.45,
-                  ease: [0.19, 1, 0.22, 1],
+                  // TikTok 스타일 빠르고 자연스러운 카드 전환
+                  duration: 0.32,
+                  ease: [0.16, 1, 0.3, 1],
                 }
           }
           className="absolute inset-0 flex flex-col safe-top safe-bottom touch-none bg-black"
@@ -419,7 +422,7 @@ export default function CardClient() {
             </div>
             <button
               onClick={() => router.back()}
-              className="w-9 h-9 flex items-center justify-center rounded-full glass active:scale-95 transition text-white/85 text-[14px]"
+              className="w-10 h-10 flex items-center justify-center rounded-full glass active:scale-95 transition text-white/85 text-[14px]"
               aria-label="닫기"
             >
               ✕
@@ -463,6 +466,51 @@ export default function CardClient() {
                 >
                   숏폼
                 </span>
+                {ctxParam === "mine" && (
+                  <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (typeof window === "undefined") return;
+                      const q = encodeURIComponent(star.title);
+                      window.open(
+                        `https://www.google.com/search?q=${q}`,
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full pointer-events-auto active:scale-[0.97] transition"
+                    style={{
+                      background: "rgba(245, 231, 196, 0.14)",
+                      backdropFilter: "blur(10px)",
+                      WebkitBackdropFilter: "blur(10px)",
+                      color: "rgba(255, 240, 200, 0.95)",
+                      fontSize: 10,
+                      letterSpacing: "-0.01em",
+                      fontWeight: 400,
+                      border: "1px solid rgba(245, 231, 196, 0.22)",
+                    }}
+                    aria-label={`${star.title} 더 알아보기`}
+                  >
+                    더 알아보기
+                    <svg
+                      width="9"
+                      height="9"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      style={{ marginLeft: 1 }}
+                      aria-hidden
+                    >
+                      <path
+                        d="M7 17L17 7M9 7h8v8"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                )}
               </div>
               <h3
                 className="text-white text-[18px] font-light tracking-tight leading-snug"
@@ -656,14 +704,13 @@ function ShootingStar({ active }: { active: boolean }) {
 }
 
 /**
- * 사용법 hint — 거슬리지 않게:
- *  - 한 번에 한 메시지만, 시퀀셜 페이드 인/아웃
- *  - 1.2s 텀 후 등장 → 3.4s 노출 → 0.8s 페이드 아웃
- *  - 낮은 opacity, 작은 글자 — 영상에 묻히게
- *  - 첫 사용자 상호작용(long press / swipe / tap) 감지 시 즉시 사라지고 다시 안 보임
+ * 사용법 hint — 한 줄 글래스 chip으로 또렷하게.
+ * 위치: 화면 상단 헤더 바로 아래 가운데 — 콘텐츠(영상·하단 메타) 안 가림.
+ * 1.2s 후 등장 → 5s 노출 → 부드럽게 페이드 아웃.
+ * 첫 사용자 상호작용(swipe/tap/longpress) 시 즉시 dismiss + 세션 동안 다시 안 보임.
  */
 function FirstHintToast({ isMyStar }: { isMyStar: boolean }) {
-  const [step, setStep] = useState(0); // 0=hidden, 1=longpress, 2=swipe, 3=done
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (typeof sessionStorage === "undefined") return;
@@ -671,14 +718,13 @@ function FirstHintToast({ isMyStar }: { isMyStar: boolean }) {
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
 
-    const timers: number[] = [];
-    timers.push(window.setTimeout(() => setStep(1), 1200));
-    timers.push(window.setTimeout(() => setStep(2), 5400));
-    timers.push(window.setTimeout(() => setStep(3), 9600));
+    const showTimer = window.setTimeout(() => setVisible(true), 1200);
+    const hideTimer = window.setTimeout(() => setVisible(false), 6200);
 
     const dismiss = () => {
-      timers.forEach((t) => window.clearTimeout(t));
-      setStep(3);
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+      setVisible(false);
       window.removeEventListener("pointerdown", dismiss);
       window.removeEventListener("touchstart", dismiss);
       window.removeEventListener("keydown", dismiss);
@@ -688,44 +734,99 @@ function FirstHintToast({ isMyStar }: { isMyStar: boolean }) {
     window.addEventListener("keydown", dismiss, { once: true });
 
     return () => {
-      timers.forEach((t) => window.clearTimeout(t));
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
       window.removeEventListener("pointerdown", dismiss);
       window.removeEventListener("touchstart", dismiss);
       window.removeEventListener("keydown", dismiss);
     };
   }, []);
 
-  const text =
-    step === 1
-      ? `꾹 눌러 ${isMyStar ? "흘려보내기" : "별 추가"}`
-      : step === 2
-      ? "위로 쓸어올려 다음 영상"
-      : "";
-
   return (
-    <AnimatePresence mode="wait">
-      {step !== 0 && step !== 3 && (
+    <AnimatePresence>
+      {visible && (
         <motion.div
-          key={step}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.7, ease: [0.19, 1, 0.22, 1] }}
-          className="absolute bottom-4 left-0 right-0 z-10 pointer-events-none flex justify-center"
+          className="absolute top-16 left-0 right-0 z-20 flex justify-center pointer-events-none px-6"
         >
-          <p
-            className="text-[10px] font-light"
+          <div
+            className="flex items-center gap-2.5 px-3.5 py-2 rounded-full"
             style={{
-              color: "rgba(255, 255, 255, 0.32)",
-              letterSpacing: "0.02em",
-              textShadow: "0 0 12px rgba(0,0,0,0.6)",
+              background: "rgba(15, 12, 25, 0.65)",
+              backdropFilter: "blur(18px) saturate(140%)",
+              WebkitBackdropFilter: "blur(18px) saturate(140%)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
             }}
           >
-            {text}
-          </p>
+            <HintItem icon="↑" label="다음" />
+            <HintDot />
+            <HintItem icon="←→" label="다른 별" />
+            <HintDot />
+            <HintItem
+              icon="꾹"
+              label={isMyStar ? "흘려보내기" : "추가"}
+              accent
+            />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function HintItem({
+  icon,
+  label,
+  accent = false,
+}: {
+  icon: string;
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        style={{
+          fontSize: 11,
+          color: accent
+            ? "rgba(245, 231, 196, 0.95)"
+            : "rgba(255, 255, 255, 0.85)",
+          fontWeight: 300,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {icon}
+      </span>
+      <span
+        style={{
+          fontSize: 10,
+          color: accent
+            ? "rgba(245, 231, 196, 0.85)"
+            : "rgba(255, 255, 255, 0.7)",
+          fontWeight: 300,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
+
+function HintDot() {
+  return (
+    <span
+      style={{
+        width: 2,
+        height: 2,
+        borderRadius: "50%",
+        background: "rgba(255, 255, 255, 0.25)",
+      }}
+    />
   );
 }
 

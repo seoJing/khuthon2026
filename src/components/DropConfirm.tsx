@@ -17,13 +17,14 @@ export function DropConfirm({ open, starId, onConfirm, onCancel }: Props) {
     <AnimatePresence>
       {open && star && (
         <motion.div
-          className="absolute inset-0 z-50 flex flex-col items-center justify-center safe-top safe-bottom px-7 text-center"
+          className="absolute inset-0 z-50"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
           <CosmicBackdrop density={0.5} variant="soft" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center safe-top safe-bottom px-7 text-center">
           <motion.div
             initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -56,6 +57,7 @@ export function DropConfirm({ open, starId, onConfirm, onCancel }: Props) {
               돌아가기
             </button>
           </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

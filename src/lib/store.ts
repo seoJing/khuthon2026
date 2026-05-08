@@ -13,18 +13,33 @@ export interface OtherUniverseStar {
   addedAt: number;
 }
 
+export interface NotificationItem {
+  id: string;
+  starIds: string[];
+  starCount: number;
+  encounterRegionLabel: string | null;
+  sentAt: number;
+  opened: boolean;
+}
+
 interface AppState {
   onboarded: boolean;
   myStars: ConstellationStar[];
   otherUniverse: OtherUniverseStar[];
   cooldowns: Record<string, number>;
+  notifications: NotificationItem[];
+  customStars: Star[];
 
+  addCustomStar: (star: Star) => void;
   completeOnboarding: (starIds: string[]) => void;
   addStar: (
     starId: string,
   ) => { ok: true } | { ok: false; reason: "full"; current: ConstellationStar[] };
   forceAddStar: (starId: string, replaceTargetId: string) => void;
   dropStar: (starId: string) => { ok: boolean; reason?: "last" };
+
+  setNotifications: (items: NotificationItem[]) => void;
+  markNotificationOpenedLocal: (id: string) => void;
 
   resetAll: () => void;
 }
@@ -44,6 +59,14 @@ export const useApp = create<AppState>()(
       myStars: [],
       otherUniverse: seedOtherUniverse(),
       cooldowns: {},
+      notifications: [],
+      customStars: [],
+
+      addCustomStar: (star) => {
+        const { customStars } = get();
+        if (customStars.some((c) => c.id === star.id)) return;
+        set({ customStars: [...customStars, star] });
+      },
 
       completeOnboarding: (starIds) => {
         // dedup + 7개 cap
@@ -102,12 +125,27 @@ export const useApp = create<AppState>()(
         return { ok: true };
       },
 
+      setNotifications: (items) => {
+        set({ notifications: items });
+      },
+
+      markNotificationOpenedLocal: (id) => {
+        const { notifications } = get();
+        set({
+          notifications: notifications.map((n) =>
+            n.id === id ? { ...n, opened: true } : n,
+          ),
+        });
+      },
+
       resetAll: () => {
         set({
           onboarded: false,
           myStars: [],
           otherUniverse: seedOtherUniverse(),
           cooldowns: {},
+          notifications: [],
+          customStars: [],
         });
       },
     }),
@@ -118,6 +156,7 @@ export const useApp = create<AppState>()(
         myStars: s.myStars,
         cooldowns: s.cooldowns,
         otherUniverse: s.otherUniverse,
+        customStars: s.customStars,
       }),
       // hydrate 시 기존 손상 데이터 자동 복구 — 중복 제거 + 7개 cap
       onRehydrateStorage: () => (state) => {
@@ -179,5 +218,7 @@ export function isStarKnown(myStars: ConstellationStar[], starId: string): boole
 }
 
 export function resolveStar(starId: string): Star | undefined {
-  return STARS.find((s) => s.id === starId);
+  const fromStatic = STARS.find((s) => s.id === starId);
+  if (fromStatic) return fromStatic;
+  return useApp.getState().customStars.find((s) => s.id === starId);
 }

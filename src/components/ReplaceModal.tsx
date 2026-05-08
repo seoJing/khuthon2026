@@ -26,13 +26,14 @@ export function ReplaceModal({ open, newStarId, onCancel, onDone }: Props) {
     <AnimatePresence>
       {open && newStar && (
         <motion.div
-          className="absolute inset-0 z-50 flex flex-col safe-top safe-bottom"
+          className="absolute inset-0 z-50"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
           <CosmicBackdrop density={0.4} variant="soft" />
+          <div className="absolute inset-0 flex flex-col safe-top safe-bottom">
 
           {!pendingDropId ? (
             <div className="relative flex-1 flex flex-col px-6 py-7">
@@ -111,6 +112,7 @@ export function ReplaceModal({ open, newStarId, onCancel, onDone }: Props) {
               </div>
             </div>
           )}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -33,6 +33,14 @@ export async function dropStarRemote(payload: {
   return r.data as { ok: true };
 }
 
+export async function setConstellationRemote(payload: {
+  starIds: string[];
+}): Promise<{ ok: true; count: number }> {
+  const fn = httpsCallable(fns(), "setConstellation");
+  const r = await fn(payload);
+  return r.data as { ok: true; count: number };
+}
+
 export async function handlePingRemote(payload: {
   lat: number;
   lng: number;
@@ -109,4 +117,33 @@ export async function getStarFeedRemote(payload: {
     nextPageToken: string | null;
     cached: boolean;
   };
+}
+
+export async function injectFakeEncounterRemote(payload: {
+  region?: string;
+  lat?: number;
+  lng?: number;
+}): Promise<{
+  ok: true;
+  notifId: string;
+  addedCount: number;
+  region: string;
+}> {
+  const fn = httpsCallable(fns(), "injectFakeEncounter");
+  const r = await fn(payload);
+  return r.data as {
+    ok: true;
+    notifId: string;
+    addedCount: number;
+    region: string;
+  };
+}
+
+export async function createCustomStarRemote(payload: {
+  title: string;
+  categoryId: number;
+}): Promise<{ ok: true; starId: string; existed: boolean }> {
+  const fn = httpsCallable(fns(), "createCustomStar");
+  const r = await fn(payload);
+  return r.data as { ok: true; starId: string; existed: boolean };
 }

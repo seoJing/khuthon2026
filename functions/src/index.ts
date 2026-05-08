@@ -19,7 +19,7 @@ const db = admin.firestore();
 const messaging = admin.messaging();
 
 // ---------- 공통 상수 ----------
-const PROXIMITY_M = 100;
+const PROXIMITY_M = 30;
 const COOLDOWN_DAYS = 7;
 const ALERT_DAILY_LIMIT = 5;
 const PING_TTL_MIN = 5;
@@ -484,6 +484,313 @@ export const markNotificationOpened = onCall<{ notifId: string }>(
     return { ok: true };
   },
 );
+
+// ---------- 별자리 일괄 동기화 ----------
+/**
+ * 클라사이드 zustand의 myStars 를 Firestore 와 일괄 sync.
+ * - 매칭 파이프라인이 서버에서 별자리를 읽으려면 필수.
+ * - 클라가 onboarding 완료 / 별 추가 / 떨구기 시 매번 호출 (마지막 상태 push).
+ * - 7개 cap, dedup, BR-12 쿨다운 보존.
+ */
+export const setConstellation = onCall<{ starIds: string[] }>(async (request) => {
+  if (!request.auth)
+    throw new HttpsError("unauthenticated", "Sign in required");
+  const uid = request.auth.uid;
+  const rawIds = Array.isArray(request.data?.starIds)
+    ? request.data.starIds
+    : [];
+  // dedup + 7개 cap
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const id of rawIds) {
+    if (typeof id !== "string" || !id) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= 7) break;
+  }
+
+  const constRef = db.collection("users").doc(uid).collection("constellation");
+  const existing = await constRef.get();
+  const existingIds = new Set(existing.docs.map((d) => d.id));
+  const targetIds = new Set(ids);
+
+  const batch = db.batch();
+  // Remove ones not in new set
+  for (const doc of existing.docs) {
+    if (!targetIds.has(doc.id)) batch.delete(doc.ref);
+  }
+  // Add ones that are new (preserve addedAt for existing)
+  for (const id of ids) {
+    if (!existingIds.has(id)) {
+      batch.set(constRef.doc(id), {
+        starId: id,
+        addedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  }
+  await batch.commit();
+  return { ok: true, count: ids.length };
+});
+
+// ---------- 자유 입력 별 (BR-14) ----------
+/**
+ * 사용자가 직접 만드는 별. 제목 + 카테고리만 받음.
+ * - title 1~40자
+ * - categoryId 1~16
+ * - 동일 사용자가 같은 제목 다시 만들면 기존 별 ID 반환 (idempotent)
+ *
+ * MVP: 매칭 후보에는 포함하지 않음 (BR-14 본인만 보유). scope=global 로 저장하지만
+ * 매칭 파이프라인이 isUserCreated 별을 다른 사람에게 넘기지 않도록 future-work.
+ */
+export const createCustomStar = onCall<{
+  title: string;
+  categoryId: number;
+}>(async (request) => {
+  if (!request.auth)
+    throw new HttpsError("unauthenticated", "Sign in required");
+  const uid = request.auth.uid;
+  const title = (request.data?.title ?? "").trim();
+  const categoryId = request.data?.categoryId;
+
+  if (!title || title.length < 1 || title.length > 40) {
+    throw new HttpsError("invalid-argument", "제목은 1~40자");
+  }
+  if (
+    !Number.isInteger(categoryId) ||
+    categoryId < 1 ||
+    categoryId > 16
+  ) {
+    throw new HttpsError("invalid-argument", "카테고리를 선택해주세요");
+  }
+
+  // 같은 사용자가 같은 제목으로 다시 만들면 기존 별 반환
+  const existing = await db
+    .collection("stars")
+    .where("createdBy", "==", uid)
+    .where("title", "==", title)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    return { ok: true, starId: existing.docs[0].id, existed: true };
+  }
+
+  const rand = Math.random().toString(36).slice(2, 6);
+  const id = `u_${uid.slice(0, 6)}_${Date.now()}_${rand}`;
+  const tag = title
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^\w가-힣_]/g, "")
+    .slice(0, 30) || `custom_${rand}`;
+
+  await db
+    .collection("stars")
+    .doc(id)
+    .set({
+      id,
+      tag,
+      title,
+      description: "",
+      categoryId,
+      scope: "global",
+      regionCode: null,
+      regionLabel: null,
+      isUserCreated: true,
+      createdBy: uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+  return { ok: true, starId: id, existed: false };
+});
+
+// ---------- 시연용 fake encounter (다른 사용자 없이 데모) ----------
+/**
+ * 친구의 태깅 로직과 충돌하지 않는 별도 데모 함수.
+ * - 사용자가 모르는 별 + scope 통과 후보를 선별
+ * - 무작위 3~5개를 다른 우주 풀에 추가
+ * - 알림 doc 생성 (홈 알림 chip 트리거)
+ *
+ * Auth: 인증 필요. 누구든 자기 계정에 fake encounter 만들 수 있음.
+ */
+export const injectFakeEncounter = onCall<{
+  region?: string;
+  lat?: number;
+  lng?: number;
+}>(async (request) => {
+  if (!request.auth)
+    throw new HttpsError("unauthenticated", "Sign in required");
+  const uid = request.auth.uid;
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  const user = userSnap.data() ?? {};
+  const tz = (user.timezone as string) || "Asia/Seoul";
+  const dayKey = dayKeyFor(tz, new Date());
+
+  // 시연용 좌표 — 한국 주요 지역
+  const SAMPLE: Record<string, { lat: number; lng: number; label: string }> = {
+    성수동: { lat: 37.544, lng: 127.055, label: "성수동" },
+    홍대: { lat: 37.553, lng: 126.927, label: "홍대" },
+    을지로: { lat: 37.567, lng: 126.992, label: "을지로" },
+    경희대: { lat: 37.243, lng: 127.078, label: "영통" },
+    서울: { lat: 37.5665, lng: 126.978, label: "서울" },
+  };
+  let sample: { lat: number; lng: number; label: string };
+  if (
+    typeof request.data?.lat === "number" &&
+    typeof request.data?.lng === "number"
+  ) {
+    // 실제 GPS 좌표 사용 (내 위치 스침)
+    const lat = request.data.lat;
+    const lng = request.data.lng;
+    const enc0 = regionFor(lat, lng);
+    sample = {
+      lat,
+      lng,
+      label:
+        enc0.neighborhood ?? enc0.city ?? enc0.country ?? "현재 위치",
+    };
+  } else {
+    const regionKey = request.data?.region ?? "성수동";
+    sample = SAMPLE[regionKey] ?? SAMPLE["성수동"];
+  }
+  const enc = regionFor(sample.lat, sample.lng);
+
+    const myStarsSnap = await db
+      .collection("users")
+      .doc(uid)
+      .collection("constellation")
+      .get();
+    const myIds = new Set(myStarsSnap.docs.map((d) => d.id));
+
+    const allStarsSnap = await db.collection("stars").get();
+    const candidates: Array<{
+      id: string;
+      scope: "global" | "country" | "city" | "neighborhood";
+      regionCode: string | null;
+      regionLabel: string | null;
+    }> = [];
+    for (const d of allStarsSnap.docs) {
+      if (myIds.has(d.id)) continue;
+      const data = d.data();
+      const scope = data.scope as
+        | "global"
+        | "country"
+        | "city"
+        | "neighborhood";
+      const regionCode = (data.regionCode as string | null) ?? null;
+      if (regionMatches(scope, regionCode, enc)) {
+        candidates.push({
+          id: d.id,
+          scope,
+          regionCode,
+          regionLabel: (data.regionLabel as string | null) ?? null,
+        });
+      }
+    }
+
+    if (candidates.length === 0) {
+      throw new HttpsError("not-found", "추가 가능한 별이 없어요");
+    }
+
+    // scope 별 분리 — 더 가까운 동네 별을 먼저 우선
+    const scopeRank: Record<string, number> = {
+      neighborhood: 4,
+      city: 3,
+      country: 2,
+      global: 1,
+    };
+    const shuffleInPlace = <T>(arr: T[]): T[] => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+    const byScope = candidates.reduce<Record<string, typeof candidates>>(
+      (acc, c) => {
+        const k = c.scope;
+        (acc[k] ??= []).push(c);
+        return acc;
+      },
+      {},
+    );
+    const scopeOrder = Object.keys(byScope).sort(
+      (a, b) => (scopeRank[b] ?? 0) - (scopeRank[a] ?? 0),
+    );
+    // 동네 우선으로 가져오되 너무 적으면 상위 scope 섞음
+    const targetN = Math.min(candidates.length, 3 + Math.floor(Math.random() * 3));
+    const selected: typeof candidates = [];
+    for (const scope of scopeOrder) {
+      const pool = shuffleInPlace([...byScope[scope]]);
+      for (const c of pool) {
+        if (selected.length >= targetN) break;
+        selected.push(c);
+      }
+      if (selected.length >= targetN) break;
+    }
+
+    // 다른 우주 풀에 추가
+    const batch = db.batch();
+    for (const s of selected) {
+      const ref = db
+        .collection("users")
+        .doc(uid)
+        .collection("otherUniverse")
+        .doc(s.id);
+      batch.set(ref, {
+        starId: s.id,
+        dayKey,
+        addedAt: admin.firestore.FieldValue.serverTimestamp(),
+        encounterLat: sample.lat,
+        encounterLng: sample.lng,
+        encounterRegion: enc,
+        encounterRegionLabel: regionLabelFor(s.scope, enc) ?? s.regionLabel,
+      });
+    }
+    await batch.commit();
+
+    // 알림 생성
+    const notifRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("notifications")
+      .doc();
+    await notifRef.set({
+      otherUid: "demo",
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      starCount: selected.length,
+      starIds: selected.map((s) => s.id),
+      opened: false,
+      encounterRegionLabel:
+        regionLabelFor(selected[0].scope, enc) ?? sample.label,
+    });
+
+    // FCM 푸시 — 토큰 등록되어 있으면 발송
+    if (user.fcmToken) {
+      try {
+        await messaging.send({
+          token: user.fcmToken as string,
+          notification: {
+            title: "누가 스쳐갔어요",
+            body: `당신이 모르는 ${selected.length}개의 문화 · ${sample.label}`,
+          },
+          data: {
+            notifId: notifRef.id,
+            type: "encounter",
+          },
+        });
+      } catch (err) {
+        console.warn("[fake-encounter] FCM send failed", err);
+      }
+    }
+
+    return {
+      ok: true,
+      notifId: notifRef.id,
+      addedCount: selected.length,
+      region: sample.label,
+    };
+});
 
 /**
  * 별의 YouTube Shorts 무한 피드 (UC-05).

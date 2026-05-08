@@ -8,15 +8,25 @@ import type { Star } from "@/lib/types";
 import { useApp } from "@/lib/store";
 import { CosmicBackdrop } from "@/components/Cosmos";
 import { StarPoint } from "@/components/StarPoint";
+import { WarpOverlay } from "@/components/WarpOverlay";
+import { createCustomStarRemote } from "@/lib/api";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const completeOnboarding = useApp((s) => s.completeOnboarding);
 
-  const [step, setStep] = useState<"intro" | "pick">("intro");
+  const [step, setStep] = useState<"intro" | "pick" | "permission">("intro");
   const [selected, setSelected] = useState<string[]>([]);
   const [openCategoryId, setOpenCategoryId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [warping, setWarping] = useState(false);
+
+  // 우주 진입 — 워프 트랜지션 후 /home
+  const enterUniverse = () => {
+    if (warping) return;
+    setWarping(true);
+    window.setTimeout(() => router.replace("/home"), 750);
+  };
 
   const searchResults = useMemo(() => searchStars(query), [query]);
 
@@ -31,17 +41,30 @@ export default function OnboardingPage() {
   const onComplete = () => {
     if (selected.length < 1) return;
     completeOnboarding(selected);
-    router.replace("/home");
+    setStep("permission");
   };
 
   if (step === "intro") {
-    return <IntroStep onNext={() => setStep("pick")} />;
+    return (
+      <>
+        <IntroStep onNext={() => setStep("pick")} />
+        <WarpOverlay active={warping} mode="in" />
+      </>
+    );
+  }
+  if (step === "permission") {
+    return (
+      <>
+        <PermissionStep onDone={enterUniverse} />
+        <WarpOverlay active={warping} mode="in" />
+      </>
+    );
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col safe-top safe-bottom">
+    <div className="absolute inset-0">
       <CosmicBackdrop density={0.7} variant="soft" />
-
+      <div className="absolute inset-0 flex flex-col safe-top safe-bottom">
       <header className="relative px-6 pt-2 pb-4">
         <div className="flex items-center justify-between mb-3">
           <p className="label-kr">별 고르기</p>
@@ -71,6 +94,14 @@ export default function OnboardingPage() {
             selected={selected}
             onToggle={toggleStar}
             query={query}
+            onCustomCreated={(starId) => {
+              setSelected((prev) =>
+                prev.includes(starId) || prev.length >= 7
+                  ? prev
+                  : [...prev, starId],
+              );
+              setQuery("");
+            }}
           />
         ) : (
           <CategoryGrid
@@ -87,14 +118,106 @@ export default function OnboardingPage() {
         onRemove={(id) => setSelected((prev) => prev.filter((x) => x !== id))}
         onComplete={onComplete}
       />
+      </div>
+      <WarpOverlay active={warping} mode="in" />
+    </div>
+  );
+}
+
+function PermissionStep({ onDone }: { onDone: () => void }) {
+  const [requesting, setRequesting] = useState(false);
+
+  const requestAndRegisterPush = async () => {
+    try {
+      const { requestPushPermission } = await import("@/lib/messaging");
+      const { ensureMe } = await import("@/lib/api");
+      const token = await requestPushPermission();
+      if (token) {
+        await ensureMe({ fcmToken: token });
+      }
+    } catch (err) {
+      console.warn("[push] register failed", err);
+    }
+  };
+
+  const request = () => {
+    if (requesting) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      onDone();
+      return;
+    }
+    setRequesting(true);
+    // 위치 권한 → 즉시 푸시 권한 묶음 요청 (BR-19)
+    navigator.geolocation.getCurrentPosition(
+      async () => {
+        await requestAndRegisterPush();
+        onDone();
+      },
+      async () => {
+        await requestAndRegisterPush();
+        onDone();
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
+  return (
+    <div className="absolute inset-0">
+      <CosmicBackdrop density={1.05} variant="deep" />
+      <div className="absolute inset-0 flex flex-col items-center justify-between safe-top safe-bottom px-7">
+      <div className="relative flex-1 flex flex-col items-center justify-center text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: [0.19, 1, 0.22, 1] }}
+        >
+          <div className="flex justify-center mb-7">
+            <StarPoint size={6} intensity="medium" twinkle />
+          </div>
+          <p className="label-kr">스쳐가는 사람을 만나려면</p>
+          <h1 className="display-light text-[26px] mt-5 leading-[1.45]">
+            위치가 필요해요
+          </h1>
+          <div className="mt-7 mx-auto w-10 h-px bg-white/15" />
+          <p className="mt-7 text-[13px] text-fg-dim body-soft max-w-[280px]">
+            반경 100m 안으로 누군가 스쳐갔을 때만
+            <br />
+            서로의 별자리에서 모르는 별 하나가
+            <br />
+            다른 우주에 떨어져요.
+          </p>
+        </motion.div>
+      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.8 }}
+        className="relative w-full max-w-sm space-y-3 mb-2"
+      >
+        <button
+          onClick={request}
+          disabled={requesting}
+          className="w-full bg-fg text-bg rounded-full py-4 text-[14px] font-medium tracking-tight active:scale-[0.98] disabled:opacity-50 transition"
+        >
+          {requesting ? "확인 중…" : "허용"}
+        </button>
+        <button
+          onClick={onDone}
+          className="w-full label-kr-bright py-2 active:text-fg transition"
+        >
+          나중에
+        </button>
+      </motion.div>
+      </div>
     </div>
   );
 }
 
 function IntroStep({ onNext }: { onNext: () => void }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-between safe-top safe-bottom px-7">
+    <div className="absolute inset-0">
       <CosmicBackdrop density={1.1} variant="deep" />
+      <div className="absolute inset-0 flex flex-col items-center justify-between safe-top safe-bottom px-7">
       <div className="relative flex-1 flex flex-col items-center justify-center text-center">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -127,6 +250,7 @@ function IntroStep({ onNext }: { onNext: () => void }) {
       >
         시작하기
       </motion.button>
+      </div>
     </div>
   );
 }
@@ -210,23 +334,17 @@ function SearchResults({
   selected,
   onToggle,
   query,
+  onCustomCreated,
 }: {
   results: Star[];
   selected: string[];
   onToggle: (id: string) => void;
   query: string;
+  onCustomCreated: (starId: string) => void;
 }) {
   if (results.length === 0) {
     return (
-      <div className="mt-12 text-center">
-        <p className="label-kr">찾는 별이 없어요</p>
-        <p className="mt-3 text-[13px] text-fg-dim font-light tracking-tight">
-          {`"${query}"`} 별을 찾지 못했어요
-        </p>
-        <p className="mt-2 label-kr-fine">
-          자유 입력 별은 다음 버전에서
-        </p>
-      </div>
+      <CreateCustomStar query={query} onCreated={onCustomCreated} />
     );
   }
   return (
@@ -239,6 +357,138 @@ function SearchResults({
           onClick={() => onToggle(s.id)}
         />
       ))}
+    </div>
+  );
+}
+
+function CreateCustomStar({
+  query,
+  onCreated,
+}: {
+  query: string;
+  onCreated: (starId: string) => void;
+}) {
+  const addCustomStar = useApp((s) => s.addCustomStar);
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(query);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async () => {
+    if (submitting) return;
+    setError(null);
+    const t = title.trim();
+    if (!t) {
+      setError("제목을 입력해주세요");
+      return;
+    }
+    if (!categoryId) {
+      setError("카테고리를 골라주세요");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const r = await createCustomStarRemote({ title: t, categoryId });
+      // 클라 store 에도 추가 (resolveStar 가 lookup 가능)
+      addCustomStar({
+        id: r.starId,
+        tag: t,
+        title: t,
+        description: "",
+        categoryId,
+        scope: "global",
+        regionLabel: null,
+        isUserCreated: true,
+      });
+      onCreated(r.starId);
+      setOpen(false);
+      setTitle("");
+      setCategoryId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mt-10 text-center">
+      <p className="label-kr">찾는 별이 없어요</p>
+      <p className="mt-3 text-[13px] text-fg-dim font-light tracking-tight">
+        {`"${query}"`} 가 없으면 직접 만들어요
+      </p>
+
+      {!open ? (
+        <button
+          onClick={() => {
+            setTitle(query);
+            setOpen(true);
+          }}
+          className="mt-6 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-fg text-bg text-[13px] font-medium tracking-tight active:scale-[0.97] transition"
+        >
+          내 별 직접 만들기
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M12 5v14M5 12h14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      ) : (
+        <div className="mt-6 mx-auto max-w-sm space-y-3 text-left">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="별 이름 (예: 사이클 트레이닝)"
+            maxLength={40}
+            className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-[14px] placeholder:text-fg-muted focus:outline-none focus:border-white/25 focus:bg-white/[0.07] transition font-light tracking-tight"
+          />
+          <div>
+            <p className="label-kr-fine mb-2 px-1">카테고리</p>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategoryId(c.id)}
+                  className={`text-[12px] font-light tracking-tight px-2.5 py-1 rounded-full transition ${
+                    categoryId === c.id
+                      ? "bg-fg text-bg"
+                      : "bg-white/[0.05] text-fg/85 active:bg-white/[0.08]"
+                  }`}
+                >
+                  {c.emoji} {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && (
+            <p className="text-[11px] text-rose-300/85 font-light px-1">
+              {error}
+            </p>
+          )}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={onSubmit}
+              disabled={submitting}
+              className="flex-1 bg-fg text-bg rounded-full py-3 text-[13px] font-medium tracking-tight active:scale-[0.98] disabled:opacity-50 transition"
+            >
+              {submitting ? "만드는 중…" : "별 만들기"}
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                setError(null);
+              }}
+              className="label-kr-bright px-3 py-3"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

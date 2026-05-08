@@ -44,7 +44,7 @@ export default function OtherUniversePage() {
         </div>
         <button
           onClick={() => router.back()}
-          className="w-9 h-9 flex items-center justify-center rounded-full glass active:scale-95 transition text-fg-dim text-[14px] pointer-events-auto"
+          className="w-10 h-10 flex items-center justify-center rounded-full glass active:scale-95 transition text-fg-dim text-[14px] pointer-events-auto"
           aria-label="닫기"
         >
           ✕

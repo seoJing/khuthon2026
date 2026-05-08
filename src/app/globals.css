@@ -16,21 +16,37 @@
 
 html,
 body {
+  /* iOS 베젤 끝까지 — 100% / 100vh / 100dvh / 100lvh fallback chain */
   height: 100%;
-  background: var(--bg);
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: 100lvh;
+  background: #04050a;
   color: var(--fg);
   font-family:
     "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     "Apple SD Gothic Neo", "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
   font-feature-settings: "ss10", "kern";
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  user-select: none;
   text-rendering: optimizeLegibility;
   overflow: hidden;
   overscroll-behavior: none;
   letter-spacing: -0.01em;
   word-break: keep-all;
+  touch-action: manipulation;
+}
+
+/* iOS Safari 인풋 자동 줌 방지 — 16px 이상이면 줌 안 함 */
+input,
+textarea {
+  font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 body {
@@ -43,11 +59,15 @@ body {
 
 .app-shell {
   width: 100vw;
+  /* dvh < lvh on iOS Safari (dvh excludes URL bar). lvh이 항상 full viewport */
+  height: 100vh;
   height: 100dvh;
+  height: 100lvh;
   max-width: 480px;
   margin: 0 auto;
   position: relative;
   overflow: hidden;
+  background: #04050a;
 }
 
 .nebula {
@@ -106,10 +126,11 @@ body {
     text-wrap: balance;
   }
   .safe-top {
-    padding-top: max(env(safe-area-inset-top), 14px);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
   }
   .safe-bottom {
-    padding-bottom: max(env(safe-area-inset-bottom), 14px);
+    /* iPhone home indicator(34px) + 추가 16px 여백 = 충분한 호흡 */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   }
 
   /* 한글 디스플레이 — Pretendard Light */
