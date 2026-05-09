@@ -28,9 +28,32 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# 모든 .env (예시 제외) — firebase functions / 서버 키 누출 방지
+.env
+.env.*
+!.env.example
+!.env.*.example
+functions/.env
+functions/.env.*
+
+# Firebase / Apple / Google credentials — 절대 커밋 X
+serviceAccount*.json
+**/serviceAccount*.json
+**/firebase-adminsdk*.json
+**/google-services.json
+**/GoogleService-Info.plist
+*.p8
+*.p12
+*.mobileprovision
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 발표/데모 산출물 (대용량, 푸시 X)
+*.pptx
+/*_deck.html
+/*_interactive.html
